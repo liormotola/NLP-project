@@ -17,6 +17,7 @@ def compute_metrics(tagged_en, true_en):
     result = metric.compute(predictions=tagged_en, references=true_en)
     result = result['score']
     result = round(result, 2)
+
     return result
 
 

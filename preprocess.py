@@ -29,7 +29,7 @@ def create_train_df(text):
 
     for couple in couples:
         german, english = couple.split("English:\n")
-        german = german.split("German:\n")[-1].replace("\n", )
+        german = german.split("German:\n")[-1].replace("\n", " ")
         # tokens = []
         # sentence = []
         # poss = []
@@ -64,7 +64,9 @@ class T5DataSet(Dataset):
 
         data = data.dropna()
         self.english = data['English'].tolist()
-        self.german = data["German"].tolist()
+        german = data["German"].tolist()
+        prefix = "translate German to English: "
+        self.german = [prefix + par for par in german]
         self.max_len_german = max([len(x.split()) for x in self.german])
         self.max_len_english = max([len(x.split()) for x in self.english])
         self.model = "t5-base"
@@ -121,7 +123,7 @@ class T5DataSet(Dataset):
     def __getitem__(self, item):
 
         source_text = self.german[item]
-        target_text = self.english
+        target_text = self.english[item]
         source = self.tokenizer.batch_encode_plus(
             [source_text],
             max_length=self.max_len_german,
@@ -145,9 +147,9 @@ class T5DataSet(Dataset):
         target_ids = target["input_ids"].squeeze()
 
         return {
-            "source_ids": source_ids.to(dtype=torch.long),
-            "source_mask": source_mask.to(dtype=torch.long),
-            "target_ids": target_ids.to(dtype=torch.long)
+            "input_ids": source_ids.to(dtype=torch.long),
+            "attention_mask": source_mask.to(dtype=torch.long),
+            "labels": target_ids.to(dtype=torch.long)
         }
 
     def __len__(self):
