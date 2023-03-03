@@ -1,3 +1,5 @@
+import torch.cuda
+
 from preprocess import create_train_df, T5DataSet
 from train import train
 
