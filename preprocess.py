@@ -40,50 +40,35 @@ class T5DataSet(Dataset):
     def __init__(self, data):
 
         data = data.dropna()
-        self.english = data['English'].tolist()
+        self.targets = data['English'].tolist()
         german = data["German"].tolist()
         prefix = "translate German to English: "
-        self.german = [prefix + par for par in german]
-        self.max_len_german = max([len(x.split()) for x in self.german])
-        self.max_len_english = max([len(x.split()) for x in self.english])
+        self.inputs = [prefix + par for par in german]
+        self.max_len_german = max([len(x.split()) for x in self.inputs])
+        self.max_len_english = max([len(x.split()) for x in self.targets])
         self.model = "t5-base"
         self.tokenizer = AutoTokenizer.from_pretrained(self.model)
+
+        model_inputs = self.tokenizer(self.inputs, max_length=self.max_len_german, truncation=True)
+
+        # Setup the tokenizer for targets
+        with self.tokenizer.as_target_tokenizer():
+            labels = self.tokenizer(self.targets, max_length= self.max_len_english, truncation=True)
+
+        model_inputs["labels"] = labels["input_ids"]
+        self.model_inputs = model_inputs
 
 
     def __getitem__(self, item):
 
-        source_text = self.german[item]
-        target_text = self.english[item]
-        source = self.tokenizer.batch_encode_plus(
-            [source_text],
-            max_length=self.max_len_german,
-            pad_to_max_length=True,
-            truncation=True,
-            padding="max_length",
-            return_tensors="pt",
-        )
-        with self.tokenizer.as_target_tokenizer():
-            target = self.tokenizer.batch_encode_plus(
-                [target_text],
-                max_length=self.max_len_english,
-                pad_to_max_length=True,
-                truncation=True,
-                padding="max_length",
-                return_tensors="pt",
-            )
-
-        source_ids = source["input_ids"].squeeze()
-        source_mask = source["attention_mask"].squeeze()
-        target_ids = target["input_ids"].squeeze()
-
         return {
-            "input_ids": source_ids.to(dtype=torch.long),
-            "attention_mask": source_mask.to(dtype=torch.long),
-            "labels": target_ids.to(dtype=torch.long)
+            "input_ids": self.model_inputs["input_ids"][item],
+            "attention_mask": self.model_inputs["attention_mask"][item],
+            "labels": self.model_inputs["labels"][item]
         }
 
     def __len__(self):
-        return len(self.german)
+        return len(self.inputs)
 
 
 

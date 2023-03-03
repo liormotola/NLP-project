@@ -16,5 +16,5 @@ if __name__ == '__main__':
         test_text = test_file.read()
     test_df = create_train_df(test_text)
     test_dataset = T5DataSet(test_df)
-    train(train_dataset, test_dataset, batch_size=16)
+    train(train_dataset, test_dataset, batch_size=4)
 
