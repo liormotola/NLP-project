@@ -10,25 +10,26 @@ def postprocess_text(preds, labels):
 
 
 
-def train(train_dataset, test_dataset, batch_size):
+def train(train_dataset, test_dataset, batch_size,tokenizer):
     model_name = "t5-base-translation-from-German-to-English - checkpoints"
     args = Seq2SeqTrainingArguments(
         model_name,
         evaluation_strategy = "epoch",
         learning_rate=2e-5,
+        generation_max_length = 180,
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
         weight_decay=0.01,
         save_total_limit=3,
-        num_train_epochs=20,
+        num_train_epochs=6,
         predict_with_generate=True,
         fp16=True,
         load_best_model_at_end=True,
-        save_strategy= "epoch"
+        save_strategy= "epoch",
     )
 
     model = AutoModelForSeq2SeqLM.from_pretrained("t5-base")
-    tokenizer = train_dataset.tokenizer
+    tokenizer = tokenizer
     data_collator = DataCollatorForSeq2Seq(tokenizer, model=model, return_tensors ='pt')
 
     trainer = Seq2SeqTrainer(
@@ -43,7 +44,7 @@ def train(train_dataset, test_dataset, batch_size):
     trainer.train()
 
 def compute_metrics(eval_preds):
-    tokenizer = AutoTokenizer.from_pretrained("t5-base")
+    # tokenizer = AutoTokenizer.from_pretrained("t5-base")
     metric = evaluate.load("sacrebleu")
     preds, labels = eval_preds
     if isinstance(preds, tuple):
