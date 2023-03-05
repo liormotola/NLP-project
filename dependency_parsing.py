@@ -7,7 +7,7 @@ from torch import nn
 from sklearn.metrics import accuracy_score
 import math
 from time import time
-from transformers import AutoModel
+from transformers import AutoModel, get_linear_schedule_with_warmup
 import itertools
 from typing import List, Set, Tuple, Dict
 import numpy
@@ -304,12 +304,12 @@ class DParser(nn.Module):
 
     def forward(self,input_ids, attention_mask):
         bert_out = self.bert(input_ids,attention_mask=attention_mask )
-        sen = bert_out[0][0]
+        sen = bert_out[0][0][1:-1]
 
         couples = list(itertools.product(sen, sen))
         couples = torch.stack([torch.cat(tup) for tup in couples])
         scores = self.mlp(couples)
-        score_matrix = scores.reshape((len(input_ids[0]), len(input_ids[0])))
+        score_matrix = scores.reshape((len(input_ids[0])-2, len(input_ids[0])-2))
         diag = score_matrix.diag()
         diag = diag.view(-1, diag.shape[0])
         score_matrix.fill_diagonal_(-math.inf)
@@ -350,6 +350,10 @@ def train_model(model, data_sets, optimizer, loss_func, num_epochs: int, batch_s
     train_uas = []
     test_uas = []
     best_uas = 0.0
+    total_steps = len(data_loaders["train"])*num_epochs
+    scheduler = get_linear_schedule_with_warmup(optimizer,
+                                                num_warmup_steps=0,  # Default value in run_glue.py
+                                                num_training_steps=total_steps)
     start_time = time()
     for epoch in range(num_epochs):
         print(f"starting epoch {epoch + 1}")
@@ -373,6 +377,7 @@ def train_model(model, data_sets, optimizer, loss_func, num_epochs: int, batch_s
                 attention_mask = torch.tensor(sentence["attention_mask"][:sentence["true_lens"]]).unsqueeze(0).to(device)
                 true_heads = torch.tensor(sentence["labels"][:sentence["true_lens"]]).long().to(device)
 
+                model.zero_grad()
                 optimizer.zero_grad()
                 if phase == 'train':
                     outputs = model(input_ids, attention_mask)
@@ -382,6 +387,7 @@ def train_model(model, data_sets, optimizer, loss_func, num_epochs: int, batch_s
                         batch_loss /= counter
                         batch_loss.backward()
                         optimizer.step()
+                        scheduler.step()
                         counter = 0
                         batch_loss = torch.tensor(0.0).to(device)
                 else:
