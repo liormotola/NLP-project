@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import torch
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
@@ -6,7 +7,7 @@ from torch import nn
 from sklearn.metrics import accuracy_score
 import math
 from time import time
-
+from transformers import AutoModel
 import itertools
 from typing import List, Set, Tuple, Dict
 import numpy
@@ -294,36 +295,183 @@ def _find_cycle(parents: List[int],
     return has_cycle, list(cycle)
 
 
-class DpNet(nn.Module):
-    """
-    A neural network object for performing the dependency parsing task.
-    consists of embedding layer for pos tags, bidirectional lstm and MLP. outputs a score matrix.
-    It can only take batches of size 1.
-    """
+class DParser(nn.Module):
+    def __init__(self, model_name = "bert-base-uncased",hidden_dim = 100):
+        super(DParser, self).__init__()
+        self.bert = AutoModel.from_pretrained(model_name)
+        self.mlp = nn.Sequential(nn.Linear(self.bert.config.hidden_size * 2, hidden_dim), nn.ReLU(),
+                                 nn.Linear(hidden_dim, 1))
 
-    def __init__(self, pos_vocab_size, embedding_dim=30, pos_embedding_dim=20, hidden_dim=50, hidden_dim_2=100):
-        super().__init__()
-        self.embedding_dim = embedding_dim
-        self.pos_embedding_dim = pos_embedding_dim
-        self.pos_embedding = nn.Embedding(pos_vocab_size, self.pos_embedding_dim)
-        self.hidden_dim = hidden_dim
-        self.lstm = nn.LSTM(self.embedding_dim, self.hidden_dim, batch_first=True, num_layers=2, bidirectional=True,
-                            dropout=0.25)
-        self.mlp = nn.Sequential(nn.Linear(self.hidden_dim * 4, hidden_dim_2), nn.ReLU(),
-                                 nn.Linear(hidden_dim_2, 1))
+    def forward(self,input_ids, attention_mask):
+        bert_out = self.bert(input_ids,attention_mask=attention_mask )
+        sen = bert_out[0][0]
 
-    def forward(self, embedded_sentence, pos, true_lens):
-        pos_embeds = self.pos_embedding(pos)
-        embedded_sentence = torch.cat((embedded_sentence, pos_embeds), dim=1)
-        lstm_out, _ = self.lstm(embedded_sentence.view(-1, len(embedded_sentence), self.embedding_dim))
-        sen = lstm_out[0]
         couples = list(itertools.product(sen, sen))
         couples = torch.stack([torch.cat(tup) for tup in couples])
         scores = self.mlp(couples)
-        score_matrix = scores.reshape((true_lens[0], true_lens[0]))
+        score_matrix = scores.reshape((len(input_ids[0]), len(input_ids[0])))
         diag = score_matrix.diag()
         diag = diag.view(-1, diag.shape[0])
         score_matrix.fill_diagonal_(-math.inf)
         score_matrix = torch.cat((diag, score_matrix))
 
         return score_matrix
+
+
+def train_model(model, data_sets, optimizer, loss_func, num_epochs: int, batch_size=1, model_name="model.pkl"):
+    """
+    Trains the given model with the given optimizer and loss function for num_epochs epochs.
+    Saves the best model to pickle file called model_name.
+    Saves all loss and uas results per epoch for both train and test data
+    Prints total training time
+
+    Parameters
+    ----------
+    model: Model to train
+    data_sets: Dict where keys are dataset type and values are the corresponding dataset object.
+    optimizer: optimizer to use during training.
+    loss_func: loss function to use during training.
+    num_epochs: number of training epochs.
+    pos2idx: dictionary mapping from pos tags to indices. keys are tags, values are indices.
+    batch_size: batch size
+    model_name: name of the pkl file which the best performing model will be saved to
+
+    Returns
+    -------
+    train_loss, train_uas, test_loss, test_uas lists of loss and uas pre epoch for both train and test data.
+    """
+    out_file = open("dparser_results.txt",'w')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    data_loaders = {"train": DataLoader(data_sets["train"], batch_size=batch_size, shuffle=True),
+                    "test": DataLoader(data_sets["test"], batch_size=batch_size, shuffle=False)}
+    model.to(device)
+    train_loss = []
+    test_loss = []
+    train_uas = []
+    test_uas = []
+    best_uas = 0.0
+    start_time = time()
+    for epoch in range(num_epochs):
+        print(f"starting epoch {epoch + 1}")
+        epoch_start_time = time()
+        print(f'Epoch {epoch + 1}/{num_epochs}',file=out_file)
+        print('-' * 10,file=out_file)
+
+        for phase in ['train', 'test']:
+            if phase == 'train':
+                model.train()
+            else:
+                model.eval()
+
+            running_loss = 0.0
+            labels, preds = [], []
+            counter = 0
+            batch_loss = torch.tensor(0.0).to(device)
+            for sentence in data_loaders[phase]:
+                counter += 1
+                input_ids = torch.tensor(sentence["input_ids"][:sentence["true_lens"]]).unsqueeze(0).to(device)
+                attention_mask = torch.tensor(sentence["attention_mask"][:sentence["true_lens"]]).unsqueeze(0).to(device)
+                true_heads = torch.tensor(sentence["labels"][:sentence["true_lens"]]).long().to(device)
+
+                optimizer.zero_grad()
+                if phase == 'train':
+                    outputs = model(input_ids, attention_mask)
+                    loss = loss_func(outputs.T, true_heads)
+                    batch_loss += loss
+                    if counter == 5:
+                        batch_loss /= counter
+                        batch_loss.backward()
+                        optimizer.step()
+                        counter = 0
+                        batch_loss = torch.tensor(0.0).to(device)
+                else:
+                    with torch.no_grad():
+                        outputs = model(input_ids, attention_mask)
+                        loss = loss_func(outputs.T, true_heads)
+
+                root_pad = nn.ConstantPad1d((1, 0), 0)
+                outputs = root_pad(outputs)
+                pred_heads, _ = decode_mst(outputs.cpu().detach(), sentence["true_lens"].item(), has_labels=False)
+                preds += list(pred_heads[1:])
+
+                labels += true_heads.cpu().view(-1).tolist()
+
+                running_loss += loss.item() * batch_size
+
+            epoch_loss = running_loss / len(data_sets[phase])
+            epoch_acc = accuracy_score(labels, preds)
+
+            epoch_acc = round(epoch_acc, 5)
+            if phase == "train":
+                train_loss.append(epoch_loss)
+                train_uas.append(epoch_acc)
+            else:
+                test_loss.append(epoch_loss)
+                test_uas.append(epoch_acc)
+
+            if phase.title() == "test":
+                print(f'{phase.title()} Loss: {epoch_loss:.4e} Accuracy: {epoch_acc}',file=out_file)
+                print(f'{phase.title()} Loss: {epoch_loss:.4e} Accuracy: {epoch_acc}')
+
+            else:
+                print(f'{phase.title()} Loss: {epoch_loss:.4e} Accuracy: {epoch_acc}',file=out_file)
+                print(f'{phase.title()} Loss: {epoch_loss:.4e} Accuracy: {epoch_acc}')
+
+            if phase == 'test' and epoch_acc > best_uas:
+                best_uas = epoch_acc
+                with open(model_name, 'wb+') as f:
+                    torch.save(model, f)
+
+        print(f"Epoch time: {round((time() - epoch_start_time), 3)} sec",file=out_file)
+        print(file=out_file)
+
+    print(f"Total training time: {round((time() - start_time), 3)} sec",file=out_file)
+    print(f'Best Validation Accuracy: {best_uas:4f}',file=out_file)
+    out_file.close()
+    return train_loss, train_uas, test_loss, test_uas
+
+def create_train_df(text):
+    """
+        This method converts the text into data frame of sentences with their pos tags and their true heads (labels)
+
+    Parameters
+    ----------
+    text data to convert
+
+    Returns
+    -------
+    data frame of all data
+    """
+
+
+    sentences = text.split("\n\n")[:-1]
+
+    data = {"token_counter":[],"sentences":[],"POS":[] , "heads":[]}
+
+    for sen in sentences:
+        sen = sen.split("\n")
+        tokens = []
+        sentence = []
+        poss = []
+        heads = []
+        if sen == "":
+            continue
+        for line in sen:
+            try:
+                splitted_line = line.split("\t")
+                token_counter, word, pos, head = splitted_line[0],splitted_line[1], splitted_line[3],splitted_line[6]
+                tokens.append(token_counter)
+                sentence.append(word)
+                poss.append(pos)
+                heads.append(head)
+            except:
+                print(line)
+        data["token_counter"].append(" ".join(tokens))
+        data["sentences"].append(" ".join(sentence))
+        data["POS"].append(" ".join(poss))
+        data["heads"].append(" ".join(heads))
+
+    df = pd.DataFrame(data)
+    return df
+
+
