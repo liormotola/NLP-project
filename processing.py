@@ -33,44 +33,6 @@ def create_train_df(text):
     return df
 
 
-class T5DataSet(Dataset):
-    """
-    add explanation
-    """
-
-    def __init__(self, data):
-
-        data = data.dropna()
-        self.targets = data['English'].tolist()
-        german = data["German"].tolist()
-        prefix = "translate German to English: "
-        self.inputs = [prefix + par for par in german]
-        self.max_len_german = max([len(x.split()) for x in self.inputs])
-        self.max_len_english = max([len(x.split()) for x in self.targets])
-        self.model = "t5-base"
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model)
-
-        model_inputs = self.tokenizer(self.inputs, max_length=self.max_len_german, truncation=True)
-
-        # Setup the tokenizer for targets
-        with self.tokenizer.as_target_tokenizer():
-            labels = self.tokenizer(self.targets, max_length= self.max_len_english, truncation=True)
-
-        model_inputs["labels"] = labels["input_ids"]
-        self.model_inputs = model_inputs
-
-
-    def __getitem__(self, item):
-
-        return {
-            "input_ids": self.model_inputs["input_ids"][item],
-            "attention_mask": self.model_inputs["attention_mask"][item],
-            "labels": self.model_inputs["labels"][item]
-        }
-
-    def __len__(self):
-        return len(self.inputs)
-
 
 def create_raw_data(df):
     translation = []
@@ -83,7 +45,10 @@ def create_raw_data(df):
     return dataset
 
 def postprocess_text(preds, labels):
-    preds = [pred.strip() for pred in preds]
-    labels = [[label.strip()] for label in labels]
+    preds = [pred.strip().lower() for pred in preds]
+    labels = [[label.strip().lower()] for label in labels]
 
     return preds, labels
+
+
+

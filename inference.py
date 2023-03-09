@@ -48,7 +48,7 @@ def create_raw_data_unlabeled(file_de):
 def preprocess_function_unlabeled(examples):
     prefix = "translate German to English: "
 
-    max_input_length = 180
+    max_input_length = 256
     source_lang = "de"
 
     inputs = [prefix + ex[source_lang] for ex in examples["translation"]]
@@ -69,7 +69,9 @@ val_raw_dataset = DatasetDict()
 val_raw_dataset['validation'] = vds
 
 val_tokenized_datasets = val_raw_dataset.map(preprocess_function_unlabeled, batched=True)
-model_checkpoint = "/home/student/Final Project/Lior/t5-base-translation-from-German-to-English - checkpoints/checkpoint-22500"
+# model_checkpoint = "/home/student/Final Project/Lior/t5-base-translation-from-German-to-English - checkpoints/checkpoint-22500"
+# model_checkpoint = "/home/student/Final Project/Lior/t5-base-translation-from-German-to-English extra data/checkpoint-27000"
+model_checkpoint = "/home/student/Final Project/Lior/t5-base-translation-from-German-to-English Noa/checkpoint-28000"
 
 model = AutoModelForSeq2SeqLM.from_pretrained(model_checkpoint)
 max_target_length = 180

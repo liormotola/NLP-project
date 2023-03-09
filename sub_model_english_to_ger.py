@@ -10,18 +10,24 @@ import evaluate
 
 tokenizer = AutoTokenizer.from_pretrained("t5-base")
 
-def compute_metrics(tagged_en, true_en):
-    metric = evaluate.load("sacrebleu")
-    # metric = evaluate.load("accuracy")
-    tagged_en = [x.strip().lower() for x in tagged_en]
-    true_en = [x.strip().lower() for x in true_en]
+def preprocess_function(examples):
+    prefix = "translate English to German: "
 
-    result = metric.compute(predictions=tagged_en, references=true_en)
-    result = result['score']
-    result = round(result, 2)
+    max_input_length = 180
+    max_target_length = 180
+    source_lang = "en"
+    target_lang = "de"
 
-    return result
+    inputs = [prefix + ex[source_lang] for ex in examples["translation"]]
+    targets = [ex[target_lang] for ex in examples["translation"]]
+    model_inputs = tokenizer(inputs, max_length=max_input_length, truncation=True)
 
+    # Setup the tokenizer for targets
+    with tokenizer.as_target_tokenizer():
+        labels = tokenizer(targets, max_length=max_target_length, truncation=True)
+
+    model_inputs["labels"] = labels["input_ids"]
+    return model_inputs
 
 def compute_metrics(eval_preds):
 
@@ -36,7 +42,6 @@ def compute_metrics(eval_preds):
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
     # Some simple post-processing
-
     decoded_preds, decoded_labels = postprocess_text(decoded_preds, decoded_labels)
 
     result = metric.compute(predictions=decoded_preds, references=decoded_labels)
@@ -45,59 +50,15 @@ def compute_metrics(eval_preds):
     prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds]
     result["gen_len"] = np.mean(prediction_lens)
     result = {k: round(v, 4) for k, v in result.items()}
-    file = open("noa_new_lr.txt", "a")
-    print(result,file=file)
-    print("\n",file=file)
-    file.close()
     return result
 
-
-def preprocess_function(examples):
-    prefix = "translate German to English: "
-
-    max_input_length = 256
-    max_target_length = 256
-    source_lang = "de"
-    target_lang = "en"
-
-    inputs = [prefix + ex[source_lang] for ex in examples["translation"]]
-    targets = [ex[target_lang] for ex in examples["translation"]]
-    model_inputs = tokenizer(inputs, max_length=max_input_length, truncation=True,padding=True)
-
-    # Setup the tokenizer for targets
-    with tokenizer.as_target_tokenizer():
-        labels = tokenizer(targets, max_length=max_target_length, truncation=True,padding=True)
-
-    model_inputs["labels"] = labels["input_ids"]
-    return model_inputs
-
-def preprocess_function_val(examples,tokenizer):
-    prefix = "translate German to English: "
-
-    max_input_length = 256
-    max_target_length = 256
-    source_lang = "de"
-    target_lang = "en"
-
-    inputs = [prefix + ex[source_lang] for ex in examples["translation"]]
-    targets = [ex[target_lang] for ex in examples["translation"]]
-    model_inputs = tokenizer(inputs, max_length=max_input_length, truncation=True, return_tensors="pt",padding=True)
-
-    # Setup the tokenizer for targets
-    with tokenizer.as_target_tokenizer():
-        labels = tokenizer(targets, max_length=max_target_length, truncation=True)
-
-    model_inputs["labels"] = labels["input_ids"]
-    return model_inputs
-
-
 def train(train_dataset, test_dataset, batch_size,num_epochs):
-    model_name = "t5-base-translation-from-German-to-English-Noa-new_lr"
+    model_name = "t5-base-translation-from-English-to-German neww - checkpoints"
     args = Seq2SeqTrainingArguments(
         model_name,
         evaluation_strategy = "epoch",
         learning_rate=2e-5,
-        generation_max_length = 200,
+        generation_max_length = 180,
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
         weight_decay=0.01,
@@ -106,7 +67,6 @@ def train(train_dataset, test_dataset, batch_size,num_epochs):
         predict_with_generate=True,
         fp16=True,
         load_best_model_at_end=True,
-        greater_is_better = True,
         save_strategy= "epoch",
     )
 
@@ -124,12 +84,8 @@ def train(train_dataset, test_dataset, batch_size,num_epochs):
     )
     trainer.train()
 
-
-
-def main():
+if __name__ == '__main__':
     train_df = pd.read_csv("train_data_new.csv")
-    # extra_data = pd.read_csv("old_data/generated_ger_en.csv")
-    # train_df = pd.concat([train_df,extra_data])
     test_df = pd.read_csv("test_data_new.csv")
     train_raw_df = create_raw_data(train_df)
     val_raw_df = create_raw_data(test_df)
@@ -140,12 +96,4 @@ def main():
     raw_datasets['train'] = train_dataset
     raw_datasets['validation'] = validation_dataset
     tokenized_datasets = raw_datasets.map(preprocess_function, batched=True)
-    train(tokenized_datasets['train'],tokenized_datasets['validation'],5,13)
-
-
-if __name__ == '__main__':
-
-    main()
-    # train_df = pd.read_csv("train_data_new.csv")
-    # lior=5
-
+    train(tokenized_datasets['train'], tokenized_datasets['validation'], 8, 20)
