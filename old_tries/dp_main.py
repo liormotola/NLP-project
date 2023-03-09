@@ -46,9 +46,9 @@ def preprocess(examples ):
 
 if __name__ == '__main__':
 
-    with open("data/HW3_train.labeled", "r") as train_file:
+    with open("../data/HW3_train.labeled", "r") as train_file:
         train_text = train_file.read()
-    with open("data/HW3_test.labeled", "r") as test_file:
+    with open("../data/HW3_test.labeled", "r") as test_file:
         test_text = test_file.read()
 
     train_df = create_train_df(train_text)
