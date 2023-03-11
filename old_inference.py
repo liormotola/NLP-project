@@ -1,10 +1,8 @@
 from transformers import AutoTokenizer
-from transformers import pipeline
 from datasets import Dataset, DatasetDict
 import pandas as pd
 import numpy as np
 import torch
-# from utils import *
 from transformers import AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq, Seq2SeqTrainingArguments, Seq2SeqTrainer
 from tqdm import tqdm
 from project_evaluate import read_file, compute_metrics
