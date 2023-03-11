@@ -1,4 +1,4 @@
-from new_inf import perform_inference, read_file_unlabeled
+from inference import perform_inference, read_file_unlabeled
 from project_evaluate import read_file, compute_metrics
 from time import time
 
@@ -14,26 +14,23 @@ def create_labeled_file(german_lines, predicted_english, file_name):
             f.write("\n")
 
 
-def generate_tagged_file(unlabeled_file_path,file_name, labeled_file_path="", calc_metrics =False):
+def generate_tagged_file(unlabeled_file_path,file_name,model_checkpoint):
     german_lines = read_file_unlabeled(unlabeled_file_path)
     s = time()
-    generated_english = perform_inference(german_lines)
+    generated_english = perform_inference(german_lines,model_checkpoint)
     print(time()-s)
-    if labeled_file_path and calc_metrics:
-        true_english, _ = read_file(labeled_file_path)
-        res = compute_metrics(generated_english, true_english)
-        print(f"Bleu result: {res}")
+
 
     create_labeled_file(german_lines,generated_english,file_name)
 
 
 if __name__ == '__main__':
 
-
+    model_checkpoint = "/home/student/Final Project/Lior/t5-base-translation-from-German-to-English-with_8e5-lr/checkpoint-18000"
     #generate val.labeled + calc blue over val:
-    generate_tagged_file(unlabeled_file_path="data/val.unlabeled",file_name="val",labeled_file_path="data/val.labeled",calc_metrics=True)
+    generate_tagged_file(unlabeled_file_path="data/val.unlabeled",file_name="val_8e5",model_checkpoint=model_checkpoint)
 
     #generate comp.labeled:
-    # generate_tagged_file(unlabeled_file_path="data/comp.unlabeled",file_name="comp")
+    # generate_tagged_file(unlabeled_file_path="data/comp.unlabeled",file_name="comp",model_checkpoint=model_checkpoint)
 
 

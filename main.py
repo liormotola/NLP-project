@@ -10,19 +10,6 @@ import evaluate
 
 tokenizer = AutoTokenizer.from_pretrained("t5-base")
 
-def compute_metrics(tagged_en, true_en):
-    metric = evaluate.load("sacrebleu")
-    # metric = evaluate.load("accuracy")
-    tagged_en = [x.strip().lower() for x in tagged_en]
-    true_en = [x.strip().lower() for x in true_en]
-
-    result = metric.compute(predictions=tagged_en, references=true_en)
-    result = result['score']
-    result = round(result, 2)
-
-    return result
-
-
 def compute_metrics(eval_preds):
 
     metric = evaluate.load("sacrebleu")
@@ -45,7 +32,7 @@ def compute_metrics(eval_preds):
     prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds]
     result["gen_len"] = np.mean(prediction_lens)
     result = {k: round(v, 4) for k, v in result.items()}
-    file = open("noa_new_lr.txt", "a")
+    file = open("15e5_blue.txt", "a")
     print(result,file=file)
     print("\n",file=file)
     file.close()
@@ -92,11 +79,11 @@ def preprocess_function_val(examples,tokenizer):
 
 
 def train(train_dataset, test_dataset, batch_size,num_epochs):
-    model_name = "t5-base-translation-from-German-to-English-Noa-new_lr"
+    model_name = "t5-base-translation-from-German-to-English-with_8e5-lr"
     args = Seq2SeqTrainingArguments(
         model_name,
         evaluation_strategy = "epoch",
-        learning_rate=2e-5,
+        learning_rate=15e-5,
         generation_max_length = 200,
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
@@ -109,8 +96,9 @@ def train(train_dataset, test_dataset, batch_size,num_epochs):
         greater_is_better = True,
         save_strategy= "epoch",
     )
-
+    # model_str = "/home/student/Final Project/Lior/t5-base-translation-from-German-to-English-with_5e4-lr/checkpoint-6000"
     model = AutoModelForSeq2SeqLM.from_pretrained("t5-base")
+    # model = AutoModelForSeq2SeqLM.from_pretrained(model_str)
     data_collator = DataCollatorForSeq2Seq(tokenizer, model=model, return_tensors ='pt')
 
     trainer = Seq2SeqTrainer(
@@ -133,14 +121,15 @@ def main():
     test_df = pd.read_csv("test_data_new.csv")
     train_raw_df = create_raw_data(train_df)
     val_raw_df = create_raw_data(test_df)
+
     train_dataset = Dataset.from_pandas(train_raw_df)
     validation_dataset = Dataset.from_pandas(val_raw_df)
 
-    raw_datasets = DatasetDict()
-    raw_datasets['train'] = train_dataset
-    raw_datasets['validation'] = validation_dataset
-    tokenized_datasets = raw_datasets.map(preprocess_function, batched=True)
-    train(tokenized_datasets['train'],tokenized_datasets['validation'],5,13)
+    initial_datasets = DatasetDict()
+    initial_datasets['train'] = train_dataset
+    initial_datasets['validation'] = validation_dataset
+    tokenized_datasets = initial_datasets.map(preprocess_function, batched=True)
+    train(tokenized_datasets['train'],tokenized_datasets['validation'],5,10)
 
 
 if __name__ == '__main__':
