@@ -17,7 +17,6 @@ def compute_metrics(tagged_en, true_en):
     result = metric.compute(predictions=tagged_en, references=true_en)
     result = result['score']
     result = round(result, 2)
-
     return result
 
 
@@ -29,14 +28,14 @@ def read_file(file_path):
             line = line.strip()
             if line == 'English:' or line == 'German:':
                 if len(cur_str) > 0:
-                    cur_list.append(cur_str)
+                    cur_list.append(cur_str.strip())
                     cur_str = ''
                 if line == 'English:':
                     cur_list = file_en
                 else:
                     cur_list = file_de
                 continue
-            cur_str += line
+            cur_str += line + ' '
     if len(cur_str) > 0:
         cur_list.append(cur_str)
     return file_en, file_de
@@ -50,3 +49,6 @@ def calculate_score(file_path1, file_path2):
             raise ValueError('Different Sentences')
     score = compute_metrics(file1_en, file2_en)
     print(score)
+
+if __name__ == '__main__':
+    calculate_score("data/val.labeled","val_8e5_207317744_315046490.labeled")
