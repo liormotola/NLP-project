@@ -1,4 +1,4 @@
-from inference import perform_inference, read_file_unlabeled
+from inference import perform_inference, read_file_unlabeled,perform_inference_with_roots
 from project_evaluate import read_file, compute_metrics
 from time import time
 
@@ -23,12 +23,20 @@ def generate_tagged_file(unlabeled_file_path,file_name,model_checkpoint):
 
     create_labeled_file(german_lines,generated_english,file_name)
 
+def generate_tagged_file_roots(unlabeled_file_path,file_name,model_checkpoint):
+    # german_lines = read_file_unlabeled(unlabeled_file_path)
+    s = time()
+    german_lines,generated_english = perform_inference_with_roots(unlabeled_file_path,model_checkpoint)
+    print(time()-s)
+
+
+    create_labeled_file(german_lines,generated_english,file_name)
 
 if __name__ == '__main__':
 
-    model_checkpoint = "/home/student/Final Project/Lior/t5-base-translation-from-German-to-English-with_8e5-lr/checkpoint-18000"
-    #generate val.labeled + calc blue over val:
-    generate_tagged_file(unlabeled_file_path="data/val.unlabeled",file_name="val_8e5",model_checkpoint=model_checkpoint)
+    model_checkpoint = "/home/student/Final Project/Lior/t5-base-translation-from-German-to-English-with_15e5_and_roots/checkpoint-14000"
+    #generate val.labeled :
+    generate_tagged_file_roots(unlabeled_file_path="data/val.unlabeled",file_name="val_roots",model_checkpoint=model_checkpoint)
 
     #generate comp.labeled:
     # generate_tagged_file(unlabeled_file_path="data/comp.unlabeled",file_name="comp",model_checkpoint=model_checkpoint)
