@@ -1,6 +1,6 @@
 import torch.cuda
 import pandas as pd
-from processing import create_train_df, create_raw_data , postprocess_text
+from processing import create_train_df, create_translation_df , postprocess_text
 from project_evaluate import read_file
 import project_evaluate
 from datasets import Dataset, DatasetDict
@@ -30,7 +30,7 @@ def preprocess_function(examples):
 if __name__ == '__main__':
     train_df = pd.read_csv("../train_data_new.csv")
 
-    train_raw_df = create_raw_data(train_df)
+    train_raw_df = create_translation_df(train_df)
 
     train_dataset = Dataset.from_pandas(train_raw_df)
 

@@ -57,7 +57,7 @@ model_checkpoint = "t5-base"
 tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
 
-val_file_de = read_file_unlabeled('data/val.unlabeled')
+val_file_de = read_file_unlabeled('../data/val.unlabeled')
 
 val_df = create_raw_data_unlabeled(val_file_de)
 
@@ -90,7 +90,7 @@ for i in tqdm(range(len(val_tokenized_datasets['validation'])), total=1000):
     val_preds.append(translated_text)
 
 
-true_en,_ = read_file("data/val.labeled")
+true_en,_ = read_file("../data/val.labeled")
 tokenized_true_en = [sen.split() for sen in true_en]
 res = compute_metrics(val_preds,true_en)
 print(res)
