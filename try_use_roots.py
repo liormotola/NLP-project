@@ -7,82 +7,83 @@ import torch
 from transformers import AutoModelForSeq2SeqLM
 from project_evaluate import read_file, compute_metrics
 import random
+import spacy
 
-def create_data_with_roots():
+# tokenizer = AutoTokenizer.from_pretrained("t5-base")
+
+def create_data_with_roots(file):
     random.seed(42)
-    file_en, file_de = read_file("data/train.labeled")
-    final_de = []
-    final_en = []
-    for ger, en in zip(file_de,file_en):
-        splitted_ger = ger.split("\n")[:-1]
-        splitted_en = en.split("\n")[:-1]
-        new_ger =""
-        for ger_sen, en_sen in zip(splitted_ger,splitted_en):
-            if len(en_sen.split())>4:
-                sampled = random.sample(en_sen.split()[:-1],3)
-            else:
-                sampled = random.sample(en_sen.split(), len(en_sen.split()))
-            ger_sen = " ".join(sampled) + " " + ger_sen + " "
-            new_ger += ger_sen
-        final_de.append(new_ger)
-        final_en.append(en.replace("\n"," "))
-    data = {"German": final_de, "English": final_en}
-    df = pd.DataFrame(data)
-    df.to_csv("train_data_with_roots.csv",index=False)
-    return final_de, final_en
-
-
-
-
-
-def read_file_unlabeled(file_path):
-    file_de = []
+    nlp = spacy.load("en_core_web_sm")
+    file_en, file_de = read_file(file)
     roots = []
     modifiers = []
-
-    with open(file_path, encoding='utf-8') as f:
-        cur_str, cur_list = '', []
-        for line in f.readlines():
-            line = line.strip()
-            if line[:17] == "Roots in English:" :
-                roots.append(line[18:])
-                continue
-            if line[:21] == "Modifiers in English:":
-                modifiers.append(line[22:])
-                continue
-            if line == 'German:':
-                if len(cur_str) > 0:
-                    cur_list.append(cur_str)
-                    cur_str = ''
-                cur_list = file_de
-                continue
-            if line:
-                cur_str += line +"\n"
+    for en in file_en:
+        root_str =[]
+        modifiers_par = []
+        parsed_en = nlp(en)
+        for sen in parsed_en.sents:
+            root_str.append(sen.root)
+            mods = list(sen.root.children)
+            if len(mods)<=2 :
+                modifiers_par.append(tuple(mods))
             else:
-                cur_str+= line
-    if len(cur_str) > 0:
-        cur_list.append(cur_str)
-    return file_de, roots, modifiers
+                modifiers_par.append((mods[0],mods[1]))
+        roots.append(root_str)
+        modifiers.append(modifiers_par)
 
 
+    data = {"German": file_de, "English": file_en,"Roots": roots,"Modifiers":modifiers}
+    df = pd.DataFrame(data)
+    df.to_csv("train_data_with_roots.csv",index=False)
+    return df
 
 
-def create_raw_data_unlabeled(file_de,roots,modifiers):
+def preprocess_function(samples):
+    """
+    This function performs preprocessing to data before sending it to the model. This preprocessing includes
+    adding a prefix of the task
+    :param samples:
+    :return:
+    """
+    prefix = "translate German to English: "
+
+    max_input_length = 256
+    max_target_length = 256
+    source_lang = "de"
+    target_lang = "en"
+
+    inputs = [prefix + sample[source_lang] for sample in samples["translation"]]
+    targets = [sample[target_lang] for sample in samples["translation"]]
+    model_inputs = tokenizer(inputs, max_length=max_input_length, truncation=True,padding=True)
+
+    with tokenizer.as_target_tokenizer():
+        labels = tokenizer(targets, max_length=max_target_length, truncation=True,padding=True)
+
+    model_inputs["labels"] = labels["input_ids"]
+    return model_inputs
+
+def create_translation_df_with_roots(df):
     translation = []
+    for _, row in df.iterrows():
 
-    for input,root_str,modifiers_str in zip(file_de,roots,modifiers) :
-        root_list = root_str.split(",")
-        mods_tuples_list = modifiers_str.split(", (")
-        mods_tuples_list = [" ".join(tup.strip("(").strip(")").strip().split(", ")) for tup in mods_tuples_list]
-        input = input.split("\n")[:-1]
-        input = [" ".join([r.strip(),m.strip(),i.strip()]) for i,r,m in zip(input,root_list,mods_tuples_list)]
-        input = " ".join(input)
-        raw = {'de': input}
+        prefix = ""
+        for i, (root , mods) in enumerate(zip(row["Roots"],row["Modifiers"])):
+            prefix += f"ROOT{i+1}_{root} "
+            for j,mod in enumerate(mods):
+                prefix += f"MOD{i+1}_{j+1}_{mod} "
+        prefix += ": "
+        input = prefix + row["German"]
+        target = row["English"]
+        raw = {'de': input, 'en': target}
         translation.append(raw)
 
     dataset = pd.DataFrame()
     dataset['translation'] = translation
     return dataset
+
+
+
+
 
 def preprocess_function_unlabeled(examples):
     prefix = "translate German to English: "
@@ -94,8 +95,12 @@ def preprocess_function_unlabeled(examples):
     model_inputs = tokenizer(inputs, max_length=max_input_length, truncation=True,padding=True)
     return model_inputs
 
+
+
+
+
 if __name__ == '__main__':
-    final_de, file_en = create_data_with_roots()
+    df= create_data_with_roots()
 
     val_file_en, val_file_de = read_file("data/val.labeled")
 

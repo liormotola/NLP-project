@@ -5,7 +5,7 @@ from transformers import AutoTokenizer
 
 def create_train_df(text):
     """
-        This method converts the text into data frame of sentences with their pos tags and their true heads (labels)
+    This method converts the text into data frame of sentences - 2 columns - german and english
 
     Parameters
     ----------
@@ -27,16 +27,24 @@ def create_train_df(text):
         data["German"].append(german)
         data["English"].append(english)
 
-    #     TODO add someting about the dependency parsing to this datatset
-
     df = pd.DataFrame(data)
     return df
 
 
 
-def create_raw_data(df):
+def create_translation_df(df):
     translation = []
     for input, target in zip(df.German.values, df.English.values):
+        raw = {'de': input, 'en': target}
+        translation.append(raw)
+
+    dataset = pd.DataFrame()
+    dataset['translation'] = translation
+    return dataset
+
+def create_translation_df_from_list(german,english):
+    translation = []
+    for input, target in zip(german, english):
         raw = {'de': input, 'en': target}
         translation.append(raw)
 
