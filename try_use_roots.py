@@ -1,17 +1,17 @@
-from transformers import AutoTokenizer
-from transformers import pipeline
-from datasets import Dataset, DatasetDict
 import pandas as pd
-import numpy as np
-import torch
-from transformers import AutoModelForSeq2SeqLM
-from project_evaluate import read_file, compute_metrics
+from project_evaluate import read_file
 import random
 import spacy
 
-# tokenizer = AutoTokenizer.from_pretrained("t5-base")
 
 def create_data_with_roots(file):
+    """
+    Gets a text file containing sentences in German and their translation in English.
+    Parsing the file + for each sentence in english finds its root and 2 of its modifiers if exist
+    saves all data to a pandas df + csv called "train_data_with_roots.csv"
+    :param file: path to *labeled* file to parse
+    :return: pandas data frame containing 4 columns - sentence in german, translation in english, roots in english, root's modifiers in english
+    """
     random.seed(42)
     nlp = spacy.load("en_core_web_sm")
     file_en, file_de = read_file(file)
@@ -38,31 +38,13 @@ def create_data_with_roots(file):
     return df
 
 
-def preprocess_function(samples):
-    """
-    This function performs preprocessing to data before sending it to the model. This preprocessing includes
-    adding a prefix of the task
-    :param samples:
-    :return:
-    """
-    prefix = "translate German to English: "
-
-    max_input_length = 256
-    max_target_length = 256
-    source_lang = "de"
-    target_lang = "en"
-
-    inputs = [prefix + sample[source_lang] for sample in samples["translation"]]
-    targets = [sample[target_lang] for sample in samples["translation"]]
-    model_inputs = tokenizer(inputs, max_length=max_input_length, truncation=True,padding=True)
-
-    with tokenizer.as_target_tokenizer():
-        labels = tokenizer(targets, max_length=max_target_length, truncation=True,padding=True)
-
-    model_inputs["labels"] = labels["input_ids"]
-    return model_inputs
-
 def create_translation_df_with_roots(df):
+    """
+    preparing data to create a dataset that will be sent to the hugging face models.
+    :param df: pandas df containing the data : german+english sentences , root and modifiers in english.
+    :return: pandas df with one column called translation where each row contains a dictionary with the sentence in german with a prefix of the
+     English roots and modifiers , and translation in English.
+    """
     translation = []
     for _, row in df.iterrows():
 
@@ -74,47 +56,78 @@ def create_translation_df_with_roots(df):
         prefix += ": "
         input = prefix + row["German"]
         target = row["English"]
-        raw = {'de': input, 'en': target}
-        translation.append(raw)
+        trans_dict = {'de': input, 'en': target}
+        translation.append(trans_dict)
 
-    dataset = pd.DataFrame()
-    dataset['translation'] = translation
-    return dataset
-
-
+    translation_df = pd.DataFrame()
+    translation_df['translation'] = translation
+    return translation_df
 
 
 
-def preprocess_function_unlabeled(examples):
-    prefix = "translate German to English: "
+def create_translation_df_val_with_roots(file_de,roots,modifiers,file_en):
+    """
+    preparing validation data to create a dataset that will be sent to the hugging face models.
+    The validation data already has information about roots and modifiers therefor requires different treatment.
 
-    max_input_length = 256
-    source_lang = "de"
+    :param file_de: list of sentences in german
+    :param roots: list of roots per sample in english
+    :param modifiers: list of tuples containing up to 2 modifiers for each root in roots argument
+    :param file_en: list of sentences which are the corresponding english translation of the german list.
+    :return: pandas df with one column called translation where each row contains a dictionary with the sentence in german with a prefix of the
+     English roots and modifiers , and translation in English.
+    """
+    translation = []
 
-    inputs = [prefix + ex[source_lang] for ex in examples["translation"]]
-    model_inputs = tokenizer(inputs, max_length=max_input_length, truncation=True,padding=True)
-    return model_inputs
+    for input,root_str,modifiers_str,target in zip(file_de,roots,modifiers,file_en) :
+        root_list = root_str.split(",")
+        mods_tuples_list = modifiers_str.split(", (")
+        mods_tuples_list = [(tup.strip("(").strip(")").strip().split(", ")) for tup in mods_tuples_list]
+        prefix = ""
+        for i, (root, mods) in enumerate(zip(root_list, mods_tuples_list)):
+            prefix += f"ROOT{i + 1}_{root.strip()} "
+            for j, mod in enumerate(mods):
+                prefix += f"MOD{i + 1}_{j + 1}_{mod.strip()} "
+        prefix += ": "
+        input = prefix + input
+        trans_dict = {'de': input,'en': target}
+        translation.append(trans_dict)
+
+    translation_df = pd.DataFrame()
+    translation_df['translation'] = translation
+    return translation_df
 
 
+def read_file_unlabeled_with_roots(file_path):
+    """
+    given a file in unlabeled format, returns list of the german sentences, list of roots in english and list of the root's
+    modifiers
+    :param file_path: path to the file to parse
+    :return: 3 lists of the parsed data: sentences in german, roots, modifiers
+    """
+    file_de = []
+    roots = []
+    modifiers = []
 
+    with open(file_path, encoding='utf-8') as f:
+        cur_str, cur_list = '', []
+        for line in f.readlines():
+            line = line.strip()
+            if line[:17] == "Roots in English:" :
+                roots.append(line[18:])
+                continue
+            if line[:21] == "Modifiers in English:":
+                modifiers.append(line[22:])
+                continue
+            if line == 'German:':
+                if len(cur_str) > 0:
+                    cur_list.append(cur_str)
+                    cur_str = ''
+                cur_list = file_de
+                continue
+            cur_str += line + ' '
 
+    if len(cur_str) > 0:
+        cur_list.append(cur_str)
+    return file_de, roots, modifiers
 
-if __name__ == '__main__':
-    df= create_data_with_roots()
-
-    val_file_en, val_file_de = read_file("data/val.labeled")
-
-    lior=5
-
-    # val_file_de,roots, modifiers = read_file_unlabeled('data/val.unlabeled')
-    #
-    # val_df = create_raw_data_unlabeled(val_file_de,roots, modifiers)
-    #
-    # vds = Dataset.from_pandas(val_df)
-    #
-    # val_raw_dataset = DatasetDict()
-    # val_raw_dataset['validation'] = vds
-    # model_checkpoint = "t5-base"
-    # tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
-    # val_tokenized_datasets = val_raw_dataset.map(preprocess_function_unlabeled, batched=True)
-    # lior=5
