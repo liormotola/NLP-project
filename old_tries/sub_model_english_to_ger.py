@@ -85,8 +85,8 @@ def train(train_dataset, test_dataset, batch_size,num_epochs):
     trainer.train()
 
 if __name__ == '__main__':
-    train_df = pd.read_csv("train_data_new.csv")
-    test_df = pd.read_csv("test_data_new.csv")
+    train_df = pd.read_csv("../train_data_new.csv")
+    test_df = pd.read_csv("../test_data_new.csv")
     train_raw_df = create_translation_df(train_df)
     val_raw_df = create_translation_df(test_df)
     train_dataset = Dataset.from_pandas(train_raw_df)
