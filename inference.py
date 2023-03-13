@@ -3,7 +3,7 @@ from datasets import Dataset, DatasetDict
 import pandas as pd
 import torch
 from transformers import AutoModelForSeq2SeqLM
-
+from try_use_roots import read_file_unlabeled_with_roots
 
 model_checkpoint = "t5-base"
 tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
@@ -52,38 +52,6 @@ def preprocess_function_unlabeled(examples):
     return model_inputs
 
 
-def read_file_unlabeled_with_roots(file_path):
-    file_de = []
-    roots = []
-    modifiers = []
-
-    with open(file_path, encoding='utf-8') as f:
-        cur_str, cur_list = '', []
-        for line in f.readlines():
-            line = line.strip()
-            if line[:17] == "Roots in English:" :
-                roots.append(line[18:])
-                continue
-            if line[:21] == "Modifiers in English:":
-                modifiers.append(line[22:])
-                continue
-            if line == 'German:':
-                if len(cur_str) > 0:
-                    cur_list.append(cur_str)
-                    cur_str = ''
-                cur_list = file_de
-                continue
-            if line:
-                cur_str += line +"\n"
-            else:
-                cur_str+= line
-    if len(cur_str) > 0:
-        cur_list.append(cur_str)
-    return file_de, roots, modifiers
-
-
-
-
 def create_translation_df_unlabeled_with_roots(file_de,roots,modifiers):
     translation = []
 
@@ -115,8 +83,6 @@ def perform_inference(de_input_list,model_checkpoint):
     val_raw_dataset = DatasetDict()
     val_raw_dataset['validation'] = val_dataset
     val_tokenized_datasets = val_raw_dataset.map(preprocess_function_unlabeled, batched=True)
-    # model_checkpoint = "/home/student/Final Project/Lior/t5-base-translation-from-German-to-English Noa/checkpoint-28000"
-    # model_checkpoint = "/home/student/Final Project/Lior/t5-base-translation-from-German-to-English-with_8e5-lr/checkpoint-18000"
     model = AutoModelForSeq2SeqLM.from_pretrained(model_checkpoint)
     translation = model.generate(input_ids=torch.tensor(val_tokenized_datasets['validation']["input_ids"]),
                                  attention_mask=torch.tensor(val_tokenized_datasets['validation']["attention_mask"]),
@@ -132,8 +98,6 @@ def perform_inference_with_roots(file_path,model_checkpoint):
     val_raw_dataset = DatasetDict()
     val_raw_dataset['validation'] = val_dataset
     val_tokenized_datasets = val_raw_dataset.map(preprocess_function_unlabeled, batched=True)
-    # model_checkpoint = "/home/student/Final Project/Lior/t5-base-translation-from-German-to-English Noa/checkpoint-28000"
-    # model_checkpoint = "/home/student/Final Project/Lior/t5-base-translation-from-German-to-English-with_8e5-lr/checkpoint-18000"
     model = AutoModelForSeq2SeqLM.from_pretrained(model_checkpoint)
     translation = model.generate(input_ids=torch.tensor(val_tokenized_datasets['validation']["input_ids"]),
                                  attention_mask=torch.tensor(val_tokenized_datasets['validation']["attention_mask"]),
