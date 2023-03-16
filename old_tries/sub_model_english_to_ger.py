@@ -1,8 +1,5 @@
-import torch.cuda
 import pandas as pd
-from processing import create_train_df, create_translation_df , postprocess_text
-from project_evaluate import read_file
-import project_evaluate
+from old_tries.old_processing import create_translation_df , postprocess_text
 from datasets import Dataset, DatasetDict
 from transformers import AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq, Seq2SeqTrainingArguments, Seq2SeqTrainer, AutoTokenizer
 import numpy as np

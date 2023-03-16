@@ -1,10 +1,9 @@
 import torch.cuda
 import pandas as pd
-from processing import create_train_df, create_translation_df , postprocess_text
+from old_tries.old_processing import create_translation_df
 from datasets import Dataset, DatasetDict
-from transformers import AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq, Seq2SeqTrainingArguments, Seq2SeqTrainer, AutoTokenizer
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import numpy as np
-import evaluate
 from tqdm import tqdm
 
 model =AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-base")

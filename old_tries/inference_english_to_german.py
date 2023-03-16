@@ -1,13 +1,9 @@
 import torch.cuda
 import pandas as pd
-from processing import create_train_df, create_translation_df , postprocess_text
-from project_evaluate import read_file
-import project_evaluate
+from old_tries.old_processing import create_translation_df
 from datasets import Dataset, DatasetDict
-from transformers import AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq, Seq2SeqTrainingArguments, Seq2SeqTrainer, AutoTokenizer
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import numpy as np
-import evaluate
-from project_evaluate import read_file, compute_metrics
 from tqdm import tqdm
 
 model_checkpoint = "t5-base"
