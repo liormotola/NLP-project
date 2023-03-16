@@ -1,16 +1,16 @@
-from processing import create_translation_df , postprocess_text
 import project_evaluate
 from datasets import Dataset, DatasetDict
 from transformers import AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq, Seq2SeqTrainingArguments, Seq2SeqTrainer, AutoTokenizer
 import numpy as np
 import evaluate
-from try_use_roots import create_data_with_roots, create_translation_df_with_roots, create_translation_df_val_with_roots,read_file_unlabeled_with_roots
+from processing import create_data_with_roots, create_translation_df_with_roots, create_translation_df_val_with_roots,read_file_unlabeled_with_roots ,postprocess_text
+import pandas as pd
 
 tokenizer = AutoTokenizer.from_pretrained("t5-base")
 
 def compute_metrics(eval_preds):
     """
-    function to compute eval - sacrebleu metric to be used in the training procedure. Also saves the computed metrics to file.
+    Function to compute eval - sacrebleu metric to be used in the training procedure. Also saves the computed metrics to file.
     :param eval_preds: tuple of preds and labels to be evaluated
     :return: dictionary containing the bleu results and the mean len of generated sentences
     """
@@ -35,12 +35,6 @@ def compute_metrics(eval_preds):
     result["gen_len"] = np.mean(prediction_lens)
 
     result = {k: round(v, 4) for k, v in result.items()}
-
-    #saving results to file
-    file = open("15e5_roots_sampled.txt", "a")
-    print(result,file=file)
-    print("\n",file=file)
-    file.close()
 
     return result
 
@@ -81,7 +75,7 @@ def train(train_dataset, test_dataset, batch_size,num_epochs):
     :param num_epochs: number of epochs
 
     """
-    output_dir = "t5-base-translation-from-German-to-English-sampled"
+    output_dir = "t5-base-translation-from-German-to-English-val_extra"
     args = Seq2SeqTrainingArguments(
         output_dir,
         evaluation_strategy = "epoch",
@@ -98,7 +92,8 @@ def train(train_dataset, test_dataset, batch_size,num_epochs):
         greater_is_better = True,
         save_strategy= "epoch",
     )
-    model = AutoModelForSeq2SeqLM.from_pretrained("t5-base")
+    # model = AutoModelForSeq2SeqLM.from_pretrained("t5-base")
+    model = AutoModelForSeq2SeqLM.from_pretrained("/home/student/Final Project/Lior/Final_model_val/checkpoint-12000/")
     data_collator = DataCollatorForSeq2Seq(tokenizer, model=model, return_tensors ='pt')
 
     trainer = Seq2SeqTrainer(
@@ -122,6 +117,7 @@ def main():
     # create initial validation data
     file_de, roots, modifiers = read_file_unlabeled_with_roots("data/val.unlabeled")
     file_en, file_de_labeled = project_evaluate.read_file("data/val.labeled")
+    # make sure data was created properly
     for sen1, sen2 in zip(file_de, file_de_labeled):
         if sen1.strip() != sen2.strip():
             raise ValueError('Different Sentences')
@@ -140,7 +136,37 @@ def main():
     tokenized_datasets = initial_datasets.map(preprocess_function, batched=True)
 
     #training
-    train(tokenized_datasets['train'],tokenized_datasets['validation'],5,6)
+    train(tokenized_datasets['train'],tokenized_datasets['validation'],5,2)
+
+def comp_model():
+    # create initial training data
+    train_df = create_data_with_roots("data/train.labeled")
+    train_translation_df = create_translation_df_with_roots(train_df)
+
+    # create initial validation data
+    file_de, roots, modifiers = read_file_unlabeled_with_roots("data/val.unlabeled")
+    file_en, file_de_labeled = project_evaluate.read_file("data/val.labeled")
+    #make sure data was created properly
+    for sen1, sen2 in zip(file_de, file_de_labeled):
+        if sen1.strip() != sen2.strip():
+            raise ValueError('Different Sentences')
+
+    val_translation_df = create_translation_df_val_with_roots(file_de, roots, modifiers, file_en)
+
+    # creating dataset objects
+    train_translation_df = pd.concat([train_translation_df,val_translation_df])
+    train_dataset = Dataset.from_pandas(train_translation_df)
+    validation_dataset = Dataset.from_pandas(val_translation_df)
+
+    initial_datasets = DatasetDict()
+    initial_datasets['train'] = train_dataset
+    initial_datasets['validation'] = validation_dataset
+
+    # tokenizing the datasets
+    tokenized_datasets = initial_datasets.map(preprocess_function, batched=True)
+
+    # training
+    train(tokenized_datasets['train'], tokenized_datasets['validation'], 5, 6)
 
 
 if __name__ == '__main__':
