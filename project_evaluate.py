@@ -51,4 +51,4 @@ def calculate_score(file_path1, file_path2):
     print(score)
 
 if __name__ == '__main__':
-    calculate_score("data/val.labeled","val_roots4_207317744_315046490.labeled")
+    calculate_score("data/val.labeled","val_207317744_315046490.labeled")

@@ -3,7 +3,7 @@ from datasets import Dataset, DatasetDict
 import pandas as pd
 import torch
 from transformers import AutoModelForSeq2SeqLM
-from try_use_roots import read_file_unlabeled_with_roots
+from processing import read_file_unlabeled_with_roots
 
 model_checkpoint = "t5-base"
 tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)

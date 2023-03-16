@@ -48,12 +48,13 @@ def generate_comp_tagged_file(model_checkpoint):
 
 if __name__ == '__main__':
 
-    model_checkpoint = "/home/student/Final Project/Lior/t5-base-translation-from-German-to-English-sampled/checkpoint-4000/"
+    # model_checkpoint = "/home/student/Final Project/Lior/t5-base-translation-from-German-to-English-sampled/checkpoint-4000/"
+    model_checkpoint = "/home/student/Final Project/Lior/Final_model_val/checkpoint-12000/"
     #generate val.labeled :
-    # generate_val_tagged_file(model_checkpoint=model_checkpoint)
+    generate_val_tagged_file(model_checkpoint=model_checkpoint)
 
     #generate comp.labeled:
-    generate_comp_tagged_file(model_checkpoint=model_checkpoint)
+    # generate_comp_tagged_file(model_checkpoint=model_checkpoint)
     # generate_tagged_file(unlabeled_file_path="data/comp.unlabeled",file_name="comp",model_checkpoint=model_checkpoint)
 
 
