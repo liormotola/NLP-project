@@ -37,7 +37,7 @@ def compute_metrics(eval_preds):
     result = {k: round(v, 4) for k, v in result.items()}
 
     #saving results to file
-    file = open("15e5_roots2.txt", "a")
+    file = open("15e5_roots_sampled.txt", "a")
     print(result,file=file)
     print("\n",file=file)
     file.close()
@@ -55,8 +55,8 @@ def preprocess_function(samples):
     """
     prefix = "translate German to English "
 
-    max_input_length = 256
-    max_target_length = 256
+    max_input_length = 320
+    max_target_length = 320
     source_lang = "de"
     target_lang = "en"
 
@@ -81,7 +81,7 @@ def train(train_dataset, test_dataset, batch_size,num_epochs):
     :param num_epochs: number of epochs
 
     """
-    output_dir = "t5-base-translation-from-German-to-English-with_15e5_and_val_true_roots"
+    output_dir = "t5-base-translation-from-German-to-English-sampled"
     args = Seq2SeqTrainingArguments(
         output_dir,
         evaluation_strategy = "epoch",
@@ -115,29 +115,6 @@ def train(train_dataset, test_dataset, batch_size,num_epochs):
 
 def main():
 
-    #reading data files
-    train_file_en, train_file_de = project_evaluate.read_file("data/train.labeled")
-    val_en,val_de = project_evaluate.read_file("data/val.labeled")
-
-    #creating initial datasets
-    train_translation_df = create_translation_df(german=train_file_de, english=train_file_en)
-    val_translation_df = create_translation_df(german=val_de, english=val_en)
-
-    train_dataset = Dataset.from_pandas(train_translation_df)
-    validation_dataset = Dataset.from_pandas(val_translation_df)
-
-    initial_datasets = DatasetDict()
-    initial_datasets['train'] = train_dataset
-    initial_datasets['validation'] = validation_dataset
-
-    # tokenizing the datasets
-    tokenized_datasets = initial_datasets.map(preprocess_function, batched=True)
-    # training
-    train(tokenized_datasets['train'], tokenized_datasets['validation'], 5, 10)
-
-
-def main_roots():
-
     #create initial training data
     train_df = create_data_with_roots("data/train.labeled")
     train_translation_df = create_translation_df_with_roots(train_df)
@@ -163,12 +140,12 @@ def main_roots():
     tokenized_datasets = initial_datasets.map(preprocess_function, batched=True)
 
     #training
-    train(tokenized_datasets['train'],tokenized_datasets['validation'],5,10)
+    train(tokenized_datasets['train'],tokenized_datasets['validation'],5,6)
 
 
 if __name__ == '__main__':
 
-    # main()
-    main_roots()
+    main()
+
 
 

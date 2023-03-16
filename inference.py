@@ -59,7 +59,7 @@ def preprocess_function_unlabeled(samples):
     """
     prefix = "translate German to English "
 
-    max_input_length = 256
+    max_input_length = 320
     source_lang = "de"
 
     inputs = [prefix + ex[source_lang] for ex in samples["translation"]]
@@ -86,9 +86,9 @@ def create_translation_df_unlabeled_with_roots(file_de,roots,modifiers):
         mods_tuples_list = [(tup.strip("(").strip(")").strip().split(", ")) for tup in mods_tuples_list]
         prefix = ""
         for i, (root, mods) in enumerate(zip(root_list, mods_tuples_list)):
-            prefix += f"ROOT{i + 1}_{root.strip()} "
+            prefix += f"ROOT_{root.strip()} "
             for j, mod in enumerate(mods):
-                prefix += f"MOD{i + 1}_{j + 1}_{mod.strip()} "
+                prefix += f"MOD{j + 1}_{mod.strip()} "
         prefix += ": "
         input = prefix + input
         raw = {'de': input}
@@ -98,29 +98,6 @@ def create_translation_df_unlabeled_with_roots(file_de,roots,modifiers):
     df['translation'] = translation
     return df
 
-
-
-
-def perform_inference(de_input_list,model_checkpoint):
-    """
-    given a pretrained model and list of sentences in german, performs inference and generates english translation of the germans inputs
-    :param de_input_list: list of sentences in german to be translated
-    :param model_checkpoint: path to the pretrained model to load
-    :return: list of the sentences from de_input_list translated to english.
-    """
-
-    val_df = create_raw_data_unlabeled(de_input_list)
-    val_dataset = Dataset.from_pandas(val_df)
-    val_raw_dataset = DatasetDict()
-    val_raw_dataset['validation'] = val_dataset
-    val_tokenized_datasets = val_raw_dataset.map(preprocess_function_unlabeled, batched=True)
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_checkpoint)
-    translation = model.generate(input_ids=torch.tensor(val_tokenized_datasets['validation']["input_ids"]),
-                                 attention_mask=torch.tensor(val_tokenized_datasets['validation']["attention_mask"]),
-                                 max_length=200)
-    translated_text = tokenizer.batch_decode(translation, skip_special_tokens=True)
-
-    return translated_text
 
 def perform_inference_with_roots(file_path,model_checkpoint):
     """

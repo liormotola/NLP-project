@@ -1,4 +1,4 @@
-from inference import perform_inference, read_file_unlabeled,perform_inference_with_roots
+from inference import perform_inference_with_roots
 from time import time
 
 def create_labeled_file(german_lines, predicted_english, file_name):
@@ -21,45 +21,39 @@ def create_labeled_file(german_lines, predicted_english, file_name):
             f.write("\n")
 
 
-def generate_tagged_file(unlabeled_file_path,file_name,model_checkpoint):
+def generate_val_tagged_file(model_checkpoint):
     """
-    loads model from checkpoint, performs inference over unlabeled file and save the results to a file
-    named "{file_name}_207317744_315046490.labeled".
-    :param unlabeled_file_path: file containing the unlabeled data to perform inference over. needs to be in unlabeled format.
-    :param file_name: name of the file to save the results to
-    :param model_checkpoint: path to pretrained model to perform inference
-
-    """
-    german_lines = read_file_unlabeled(unlabeled_file_path)
-    s = time()
-    generated_english = perform_inference(german_lines,model_checkpoint)
-    print(time()-s)
-
-    create_labeled_file(german_lines,generated_english,file_name)
-
-def generate_tagged_file_roots(unlabeled_file_path,file_name,model_checkpoint):
-    """
-    loads model from checkpoint, performs inference over unlabeled file and save the results to a file
-    named "{file_name}_207317744_315046490.labeled".
-    :param unlabeled_file_path: file containing the unlabeled data to perform inference over. needs to be in unlabeled format.
-    :param file_name: name of the file to save the results to
+    loads model from checkpoint, performs inference over the val unlabeled file and saves the results to a file
+    named "val_207317744_315046490.labeled".
     :param model_checkpoint: path to pretrained model to perform inference
     """
 
     s = time()
-    german_lines,generated_english = perform_inference_with_roots(unlabeled_file_path,model_checkpoint)
+    german_lines,generated_english = perform_inference_with_roots("data/val.unlabeled",model_checkpoint)
+    print(time()-s)
+    create_labeled_file(german_lines,generated_english,"val")
+
+def generate_comp_tagged_file(model_checkpoint):
+    """
+    loads model from checkpoint, performs inference over comp unlabeled file and saves the results to a file
+    named "comp_207317744_315046490.labeled".
+    :param model_checkpoint: path to pretrained model to perform inference
+    """
+
+    s = time()
+    german_lines,generated_english = perform_inference_with_roots("data/comp.unlabeled",model_checkpoint)
     print(time()-s)
 
-
-    create_labeled_file(german_lines,generated_english,file_name)
+    create_labeled_file(german_lines,generated_english,"comp")
 
 if __name__ == '__main__':
 
-    model_checkpoint = "/home/student/Final Project/Lior/t5-base-translation-from-German-to-English-with_15e5_and_roots/checkpoint-14000"
+    model_checkpoint = "/home/student/Final Project/Lior/t5-base-translation-from-German-to-English-sampled/checkpoint-4000/"
     #generate val.labeled :
-    generate_tagged_file_roots(unlabeled_file_path="data/val.unlabeled",file_name="val_roots2",model_checkpoint=model_checkpoint)
+    # generate_val_tagged_file(model_checkpoint=model_checkpoint)
 
     #generate comp.labeled:
+    generate_comp_tagged_file(model_checkpoint=model_checkpoint)
     # generate_tagged_file(unlabeled_file_path="data/comp.unlabeled",file_name="comp",model_checkpoint=model_checkpoint)
 
 

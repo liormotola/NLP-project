@@ -24,10 +24,12 @@ def create_data_with_roots(file):
         for sen in parsed_en.sents:
             root_str.append(sen.root)
             mods = list(sen.root.children)
+            mods = [mod for mod in mods if mod.text not in [",","."]]
             if len(mods)<=2 :
                 modifiers_par.append(tuple(mods))
             else:
-                modifiers_par.append((mods[0],mods[1]))
+                sampled = random.sample(mods,2)
+                modifiers_par.append((sampled[0],sampled[1]))
         roots.append(root_str)
         modifiers.append(modifiers_par)
 
@@ -37,35 +39,6 @@ def create_data_with_roots(file):
     df.to_csv("train_data_with_roots.csv",index=False)
     return df
 
-
-# def create_translation_df_with_roots(df):
-#     """
-#     preparing data to create a dataset that will be sent to the hugging face models.
-#     :param df: pandas df containing the data : german+english sentences , root and modifiers in english.
-#     :return: pandas df with one column called translation where each row contains a dictionary with the sentence in german with a prefix of the
-#      English roots and modifiers , and translation in English.
-#     """
-#     translation = []
-#     for _, row in df.iterrows():
-#
-#         prefix = ""
-#         for i, (root , mods) in enumerate(zip(row["Roots"],row["Modifiers"])):
-#             # prefix += f"ROOT{i+1}_{root} "
-#             prefix += f"ROOT_{root} "
-#             for j,mod in enumerate(mods):
-#                 # prefix += f"MOD{i+1}_{j+1}_{mod} "
-#                 prefix += f"MOD{j + 1}_{mod} "
-#                 # prefix += f"MOD_{mod} "
-#         # prefix += ": "
-#         prefix += "</s> "
-#         input = prefix + row["German"]
-#         target = row["English"]
-#         trans_dict = {'de': input, 'en': target}
-#         translation.append(trans_dict)
-#
-#     translation_df = pd.DataFrame()
-#     translation_df['translation'] = translation
-#     return translation_df
 
 def create_translation_df_with_roots(df):
     """
@@ -77,11 +50,13 @@ def create_translation_df_with_roots(df):
     translation = []
     for _, row in df.iterrows():
 
-        root_str = ", ".join([str(root) for root in row["Roots"]])
-        mods = ["("+", ".join([str(i) for i in tup]) + ")" for tup in row["Modifiers"]]
-        modifiers_str = ", ".join(mods)
-        prefix = "Roots in English: " + root_str + " Modifiers in English: " + modifiers_str
-        prefix += " </s> "
+        prefix = ""
+        for i, (root , mods) in enumerate(zip(row["Roots"],row["Modifiers"])):
+            prefix += f"ROOT_{root} "
+            for j,mod in enumerate(mods):
+                prefix += f"MOD{j + 1}_{mod} "
+        prefix += ": "
+
         input = prefix + row["German"]
         target = row["English"]
         trans_dict = {'de': input, 'en': target}
@@ -91,41 +66,6 @@ def create_translation_df_with_roots(df):
     translation_df['translation'] = translation
     return translation_df
 
-# def create_translation_df_val_with_roots(file_de,roots,modifiers,file_en):
-#     """
-#     preparing validation data to create a dataset that will be sent to the hugging face models.
-#     The validation data already has information about roots and modifiers therefor requires different treatment.
-#
-#     :param file_de: list of sentences in german
-#     :param roots: list of roots per sample in english
-#     :param modifiers: list of tuples containing up to 2 modifiers for each root in roots argument
-#     :param file_en: list of sentences which are the corresponding english translation of the german list.
-#     :return: pandas df with one column called translation where each row contains a dictionary with the sentence in german with a prefix of the
-#      English roots and modifiers , and translation in English.
-#     """
-#     translation = []
-#
-#     for input,root_str,modifiers_str,target in zip(file_de,roots,modifiers,file_en) :
-#         root_list = root_str.split(",")
-#         mods_tuples_list = modifiers_str.split(", (")
-#         mods_tuples_list = [(tup.strip("(").strip(")").strip().split(", ")) for tup in mods_tuples_list]
-#         prefix = ""
-#         for i, (root, mods) in enumerate(zip(root_list, mods_tuples_list)):
-#             # prefix += f"ROOT{i + 1}_{root.strip()} "
-#             prefix += f"ROOT_{root.strip()} "
-#             for j, mod in enumerate(mods):
-#                 # prefix += f"MOD{i + 1}_{j + 1}_{mod.strip()} "
-#                 prefix += f"MOD{j + 1}_{mod.strip()} "
-#                 # prefix += f"MOD_{mod.strip()} "
-#         # prefix += ": "
-#         prefix +="</s> "
-#         input = prefix + input
-#         trans_dict = {'de': input,'en': target}
-#         translation.append(trans_dict)
-#
-#     translation_df = pd.DataFrame()
-#     translation_df['translation'] = translation
-#     return translation_df
 
 def create_translation_df_val_with_roots(file_de,roots,modifiers,file_en):
     """
@@ -142,8 +82,15 @@ def create_translation_df_val_with_roots(file_de,roots,modifiers,file_en):
     translation = []
 
     for input,root_str,modifiers_str,target in zip(file_de,roots,modifiers,file_en) :
-        prefix = "Roots in English: " + root_str + " Modifiers in English: "+ modifiers_str
-        prefix +=" </s> "
+        root_list = root_str.split(",")
+        mods_tuples_list = modifiers_str.split(", (")
+        mods_tuples_list = [(tup.strip("(").strip(")").strip().split(", ")) for tup in mods_tuples_list]
+        prefix = ""
+        for i, (root, mods) in enumerate(zip(root_list, mods_tuples_list)):
+            prefix += f"ROOT_{root.strip()} "
+            for j, mod in enumerate(mods):
+                prefix += f"MOD{j + 1}_{mod.strip()} "
+        prefix += ": "
         input = prefix + input
         trans_dict = {'de': input,'en': target}
         translation.append(trans_dict)
@@ -151,6 +98,7 @@ def create_translation_df_val_with_roots(file_de,roots,modifiers,file_en):
     translation_df = pd.DataFrame()
     translation_df['translation'] = translation
     return translation_df
+
 
 def read_file_unlabeled_with_roots(file_path):
     """
