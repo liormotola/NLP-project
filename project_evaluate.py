@@ -49,6 +49,3 @@ def calculate_score(file_path1, file_path2):
             raise ValueError('Different Sentences')
     score = compute_metrics(file1_en, file2_en)
     print(score)
-
-if __name__ == '__main__':
-    calculate_score("data/val.labeled","val_207317744_315046490.labeled")

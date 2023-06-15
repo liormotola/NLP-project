@@ -11,7 +11,7 @@ tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
 def read_file_unlabeled(file_path):
     """
-    Given a file in unlabeled format, parsing the file and returns only the german sentenes
+    Given a file in unlabeled format, parsing the file and returns only the german sentences
     :param file_path: path of file to parse
     :return: list of sentences in german
     """
